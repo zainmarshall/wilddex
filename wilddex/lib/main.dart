@@ -14,8 +14,19 @@ import 'utils/badge_engine.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final appData = await loadAppData();
-  runApp(MyApp(appData: appData));
+  try {
+    final appData = await loadAppData();
+    runApp(MyApp(appData: appData));
+  } catch (e, st) {
+    debugPrint('Failed to load app data: $e\n$st');
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Text('Failed to load: $e', style: const TextStyle(color: Colors.red)),
+        ),
+      ),
+    ));
+  }
 }
 
 class MyApp extends StatelessWidget {
