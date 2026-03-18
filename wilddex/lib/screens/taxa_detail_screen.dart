@@ -6,6 +6,7 @@ import '../models/taxa.dart';
 import '../theme/colors.dart';
 import '../utils/user_data_provider.dart';
 import 'animal_detail_screen.dart';
+import '../widgets/web_image.dart';
 
 class TaxaDetailScreen extends StatelessWidget {
 	final Taxa taxa;
@@ -215,8 +216,8 @@ class TaxaDetailScreen extends StatelessWidget {
 													top: Radius.circular(20.0),
 												),
 												child: isDiscovered
-														? Image.network(
-																species.apiImageUrl,
+														? AppNetworkImage(
+																url: species.apiImageUrl,
 																fit: BoxFit.cover,
 																errorBuilder: (context, error, stackTrace) =>
 																		Container(color: AppColors.background),

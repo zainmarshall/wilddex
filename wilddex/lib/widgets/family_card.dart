@@ -5,6 +5,7 @@ import '../models/species.dart';
 import '../models/taxa.dart';
 import '../theme/colors.dart';
 import 'mini_species_card.dart';
+import 'web_image.dart';
 
 class FamilyCard extends StatelessWidget {
   final Family family;
@@ -175,8 +176,8 @@ class SpeciesImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: Image.network(
-        species.apiImageUrl,
+      child: AppNetworkImage(
+        url: species.apiImageUrl,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: AppColors.background,

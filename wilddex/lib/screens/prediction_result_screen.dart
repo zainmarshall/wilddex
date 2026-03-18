@@ -7,6 +7,7 @@ import '../utils/captured_image.dart';
 import '../utils/user_data_provider.dart';
 import '../theme/colors.dart';
 import 'animal_detail_screen.dart';
+import '../widgets/web_image.dart';
 
 /// Known subspecies → parent species mappings.
 /// Key: "genus|subspecies_epithet", Value: replacement species epithet.
@@ -241,8 +242,8 @@ class PredictionResultScreen extends StatelessWidget {
                     child: Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(24),
-                        child: Image.network(
-                          found.apiImageUrl,
+                        child: AppNetworkImage(
+                          url: found.apiImageUrl,
                           width: imageSize,
                           height: imageSize,
                           fit: BoxFit.cover,

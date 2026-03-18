@@ -9,6 +9,7 @@ import 'badges_screen.dart';
 import '../utils/badge_engine.dart';
 import '../data/app_data.dart';
 import '../theme/colors.dart';
+import '../widgets/web_image.dart';
 
 class ProfileScreen extends StatefulWidget {
   final List<Species> speciesList;
@@ -264,8 +265,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: ListTile(
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            species.apiImageUrl,
+          child: AppNetworkImage(
+            url: species.apiImageUrl,
             width: 60,
             height: 60,
             fit: BoxFit.cover,

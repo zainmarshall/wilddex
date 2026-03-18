@@ -8,6 +8,7 @@ import '../theme/colors.dart';
 import '../utils/user_data_provider.dart';
 import '../data/park_guides.dart';
 import 'animal_detail_screen.dart';
+import '../widgets/web_image.dart';
 
 class ParkFieldGuideScreen extends StatelessWidget {
   final List<Species> speciesList;
@@ -238,8 +239,8 @@ class _ParkDetailScreenState extends State<ParkDetailScreen> {
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: species.isDiscovered
-                              ? Image.network(
-                                  species.apiImageUrl,
+                              ? AppNetworkImage(
+                                  url: species.apiImageUrl,
                                   width: 56,
                                   height: 56,
                                   fit: BoxFit.cover,

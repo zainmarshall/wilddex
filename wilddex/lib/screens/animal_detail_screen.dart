@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../models/species.dart';
 import '../models/taxa.dart';
 import '../theme/colors.dart';
 import 'taxa_detail_screen.dart';
+import '../widgets/web_image.dart';
 
 class AnimalDetailScreen extends StatelessWidget {
   final Species species;
@@ -60,6 +62,32 @@ class SpeciesImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Skip BackdropFilter on web — it's slow and can cause rendering issues.
+    if (kIsWeb) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: AppNetworkImage(
+          url: species.apiImageUrl,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: AppColors.background,
+              child: const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => Container(
+            color: AppColors.background,
+            child: const Center(
+              child: Icon(Icons.image_not_supported, size: 48, color: AppColors.text),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Stack(
@@ -87,8 +115,8 @@ class SpeciesImage extends StatelessWidget {
           ),
           // Foreground image
           Center(
-            child: Image.network(
-              species.apiImageUrl,
+            child: AppNetworkImage(
+              url: species.apiImageUrl,
               fit: BoxFit.fitHeight,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
@@ -178,8 +206,8 @@ class _SpeciesDetailsState extends State<SpeciesDetails> {
           _buildSection(
             context,
             'Range Map',
-            Image.network(
-              species.apiRangeMapUrl,
+            AppNetworkImage(
+              url: species.apiRangeMapUrl,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => Container(
                 color: AppColors.background,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/species.dart';
 import '../theme/colors.dart';
+import 'web_image.dart';
 
 class MiniSpeciesCard extends StatelessWidget {
   final Species species;
@@ -36,8 +37,8 @@ class MiniSpeciesCard extends StatelessWidget {
     final Widget imageWidget = isDiscovered
         ? ClipRRect(
             borderRadius: borderRadius,
-            child: Image.network(
-              species.apiImageUrl,
+            child: AppNetworkImage(
+              url: species.apiImageUrl,
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
