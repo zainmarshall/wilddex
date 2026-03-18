@@ -1,10 +1,9 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'data/app_data.dart';
 import 'screens/dex_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/camera_tab.dart';
+import 'screens/camera_host.dart';
 import 'screens/park_field_guide_screen.dart';
 import 'screens/gallery_screen.dart';
 import 'utils/user_data_provider.dart';
@@ -124,34 +123,3 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-class CameraTabHost extends StatelessWidget {
-  const CameraTabHost({super.key});
-
-  Future<List<CameraDescription>> _loadCameras() async {
-    try {
-      return await availableCameras();
-    } catch (e) {
-      debugPrint('availableCameras failed: $e');
-      return [];
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<CameraDescription>>(
-      future: _loadCameras(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final cameras = snapshot.data ?? [];
-        if (cameras.isEmpty) {
-          return const SampleCameraTab(
-            errorMessage: 'No cameras available. Using sample image.',
-          );
-        }
-        return CameraTab(camera: cameras.first);
-      },
-    );
-  }
-}

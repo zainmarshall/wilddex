@@ -1,7 +1,7 @@
 
 # main.py
 
-from fastapi import FastAPI, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
@@ -16,6 +16,10 @@ import importlib
 import sys
 from typing import Optional
 from pydantic import BaseModel
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_MIME_PREFIXES = ("image/",)
+INFERENCE_TIMEOUT = int(os.getenv("INFERENCE_TIMEOUT", "60"))
 
 # NOTE: supabase import removed (unused). Add back if needed.
 
@@ -33,9 +37,12 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI(title="SpeciesNet API", version="0.1.1")
 
+_cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+_cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()] if _cors_origins_env else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Lock this down later
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -232,9 +239,17 @@ async def _generate_prediction(file: UploadFile, use_crops: bool) -> PredictionR
             direct = _DIRECT_PREDICTORS.get(use_crops)
         if direct is not None:
             try:
-                result = await asyncio.to_thread(direct.predict_file, image_path)
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(direct.predict_file, image_path),
+                    timeout=INFERENCE_TIMEOUT,
+                )
                 raw_prediction = _extract_raw_prediction(result)
                 prediction = _parse_prediction(raw_prediction)
+            except asyncio.TimeoutError:
+                logger.error("Direct inference timed out after %ds", INFERENCE_TIMEOUT)
+                if _SPECIESNET_MODE == "direct":
+                    raise RuntimeError(f"Inference timed out after {INFERENCE_TIMEOUT}s")
+                logger.info("Falling back to CLI after timeout")
             except Exception as e:
                 if _SPECIESNET_MODE == "direct":
                     raise
@@ -242,7 +257,10 @@ async def _generate_prediction(file: UploadFile, use_crops: bool) -> PredictionR
 
     if prediction is None:
         output_json_path = os.path.join(temp_dir, "output.json")
-        await asyncio.to_thread(_run_speciesnet_cli, temp_dir, output_json_path, use_crops)
+        await asyncio.wait_for(
+            asyncio.to_thread(_run_speciesnet_cli, temp_dir, output_json_path, use_crops),
+            timeout=INFERENCE_TIMEOUT,
+        )
         with open(output_json_path, "r") as f:
             raw = json.load(f)
         if not raw.get("predictions"):
@@ -286,6 +304,17 @@ async def predict(
     file: UploadFile = File(...),
     use_crops: bool = Query(default=_DEFAULT_USE_CROPS),
 ):
+    # Validate MIME type
+    content_type = file.content_type or ""
+    if not any(content_type.startswith(prefix) for prefix in ALLOWED_MIME_PREFIXES):
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {content_type}. Only images are accepted.")
+
+    # Validate file size (read up to limit + 1 byte to detect oversized files)
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large ({len(contents)} bytes). Maximum is {MAX_UPLOAD_SIZE} bytes.")
+    await file.seek(0)
+
     try:
         return await _generate_prediction(file, use_crops)
     except Exception as e:

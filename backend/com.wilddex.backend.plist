@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wilddex.backend</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/zain/Developer/wilddex/backend</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>bash</string>
+        <string>-c</string>
+        <string>source ~/.zshrc 2>/dev/null; cd /Users/zain/Developer/wilddex/backend &amp;&amp; exec uvicorn main:app --host 0.0.0.0 --port 8000</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PORT</key>
+        <string>8000</string>
+        <key>SPECIESNET_MODE</key>
+        <string>direct</string>
+        <key>MODEL_LOAD_MODE</key>
+        <string>eager</string>
+        <key>SPECIESNET_BATCH_SIZE</key>
+        <string>1</string>
+        <key>SPECIESNET_REPO_PATH</key>
+        <string>/Users/zain/Developer/wilddex/backend/cammertrapai</string>
+        <key>LOG_LEVEL</key>
+        <string>INFO</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/zain/Developer/wilddex/backend/server.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/zain/Developer/wilddex/backend/server.log</string>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>

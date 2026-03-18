@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/app_data.dart';
@@ -101,20 +102,27 @@ class GalleryScreen extends StatelessWidget {
                   final sighting = group.sightings[index];
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(sighting.imagePath),
-                      width: 96,
-                      height: 96,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 96,
-                          height: 96,
-                          color: AppColors.background,
-                          child: const Icon(Icons.image_not_supported),
-                        );
-                      },
-                    ),
+                    child: kIsWeb
+                        ? Container(
+                            width: 96,
+                            height: 96,
+                            color: AppColors.background,
+                            child: const Icon(Icons.photo, color: AppColors.text),
+                          )
+                        : Image.file(
+                            File(sighting.imagePath),
+                            width: 96,
+                            height: 96,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 96,
+                                height: 96,
+                                color: AppColors.background,
+                                child: const Icon(Icons.image_not_supported),
+                              );
+                            },
+                          ),
                   );
                 },
               ),

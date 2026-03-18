@@ -89,17 +89,14 @@ class Species {
   String get imagePath => image ?? 'assets/species/images/$id.jpg';
   Classification get displayClassification => classification ?? Classification();
   String get apiImageUrl => '$googleCloudStorageBucket/images/${id}.jpg'; ///images/leopardus_geoffroyi.jpg
-  // Try multiple extensions for range map
-  String get apiRangeMapUrl {
-    final exts = ['.png', '.jpg', '.jpeg', '.webp', '.svg'];
-    for (final ext in exts) {
-      final url = '$googleCloudStorageBucket/range/${id}_range$ext';
-      
-      return url;
-    }
-    // if it doesnt exist return a blank image
-    return 'null';
+  /// Possible range map URLs ordered by likelihood.
+  List<String> get apiRangeMapUrls {
+    const exts = ['.png', '.jpg', '.jpeg', '.webp', '.svg'];
+    return exts.map((ext) => '$googleCloudStorageBucket/range/${id}_range$ext').toList();
   }
+
+  /// Default range map URL (png).
+  String get apiRangeMapUrl => '$googleCloudStorageBucket/range/${id}_range.png';
 
 
 

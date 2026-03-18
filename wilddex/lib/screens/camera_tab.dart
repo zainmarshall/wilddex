@@ -1,22 +1,21 @@
-import 'dart:io';
 import 'dart:convert';
-import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../utils/captured_image.dart';
 import '../widgets/shutter_button.dart';
 import 'prediction_result_screen.dart';
 import '../utils/photo_saver.dart';
 import '../utils/settings_provider.dart';
 
-const double kCameraMinZoom = 1.0 ; 
-const double kCameraMaxZoom = 189.0; //physical max before error is 189
 const String kSampleImageAsset = 'assets/data/lion.png';
+const Duration kApiTimeout = Duration(seconds: 30);
 
 Future<Map<String, dynamic>> uploadImageAndGetPrediction(
-  File imageFile, {
+  CapturedImage image, {
   required String apiBaseUrl,
   required bool useCrops,
 }) async {
@@ -24,37 +23,44 @@ Future<Map<String, dynamic>> uploadImageAndGetPrediction(
     queryParameters: {'use_crops': useCrops ? 'true' : 'false'},
   );
   final request = http.MultipartRequest('POST', uri);
-  request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+  request.files.add(http.MultipartFile.fromBytes(
+    'file',
+    image.bytes,
+    filename: 'capture.jpg',
+  ));
 
-  final response = await request.send();
+  final response = await request.send().timeout(kApiTimeout);
   if (response.statusCode == 200) {
     final respStr = await response.stream.bytesToString();
     return jsonDecode(respStr);
   } else {
-    throw Exception('Failed to get prediction: ${response.statusCode}');
+    final body = await response.stream.bytesToString();
+    throw Exception('Prediction failed (${response.statusCode}): $body');
   }
 }
 
-Future<void> runPredictionFlow(BuildContext context, File imageFile) async {
+Future<void> runPredictionFlow(BuildContext context, CapturedImage image) async {
   final settings = Provider.of<SettingsProvider>(context, listen: false);
   Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => PredictionResultScreen(
-      imageFile: imageFile,
+      image: image,
       isLoading: true,
     ),
   ));
   try {
     final prediction = await uploadImageAndGetPrediction(
-      imageFile,
+      image,
       apiBaseUrl: settings.apiBaseUrl,
       useCrops: settings.useCropModel,
     );
     final binomialName = prediction['scientific_name'] ?? 'unknown';
-    await savePhotoToGallery(imageFile, binomialName: binomialName);
+    if (!kIsWeb && image.filePath != null) {
+      await savePhotoToGallery(image, binomialName: binomialName);
+    }
     if (!context.mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => PredictionResultScreen(
-        imageFile: imageFile,
+        image: image,
         predictionResult: prediction,
         isLoading: false,
       ),
@@ -64,7 +70,7 @@ Future<void> runPredictionFlow(BuildContext context, File imageFile) async {
     if (!context.mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => PredictionResultScreen(
-        imageFile: imageFile,
+        image: image,
         predictionResult: {'error': e.toString()},
         isLoading: false,
       ),
@@ -72,135 +78,66 @@ Future<void> runPredictionFlow(BuildContext context, File imageFile) async {
   }
 }
 
-class CameraTab extends StatefulWidget {
-  final CameraDescription camera;
-  const CameraTab({super.key, required this.camera});
+/// Web camera tab — uses image_picker which opens the native camera/file picker.
+class WebCameraTab extends StatefulWidget {
+  const WebCameraTab({super.key});
 
   @override
-  State<CameraTab> createState() => _CameraTabState();
+  State<WebCameraTab> createState() => _WebCameraTabState();
 }
 
-class _CameraTabState extends State<CameraTab> with SingleTickerProviderStateMixin {
-  bool _showBlackFlick = false;
-  // ...existing code...
-  CameraController? _controller;
-  bool _isInit = false;
-  bool _hasError = false;
-  double _currentZoom = 1.0;
-  double _baseZoom = 1.0; // Used for pinch-to-zoom gesture
+class _WebCameraTabState extends State<WebCameraTab> {
+  bool _isLoading = false;
+  final ImagePicker _picker = ImagePicker();
 
-  @override
-  void initState() {
-    super.initState();
-    _setupCamera();
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-
-  Future<void> _setupCamera() async {
+  Future<void> _capturePhoto() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
     try {
-      final controller = CameraController(
-        widget.camera,
-        ResolutionPreset.medium,
-        enableAudio: false,
+      final XFile? xfile = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
       );
-      await controller.initialize();
-      if (!mounted) return;
-      // Set initial zoom
-      await controller.setZoomLevel(_currentZoom);
-      setState(() {
-        _controller = controller;
-        _isInit = true;
-      });
-    } catch (e) {
-      debugPrint('Camera initialization failed: $e');
-      setState(() {
-        _hasError = true;
-      });
-    }
-  }
-
-  Future<void> _takePicture() async {
-    try {
-      if (_controller != null && _controller!.value.isInitialized) {
-        setState(() => _showBlackFlick = true);
-        await Future.delayed(const Duration(milliseconds: 80));
-        setState(() => _showBlackFlick = false);
-        final image = await _controller!.takePicture();
-        // Show loading screen while waiting for prediction
-        if (!mounted) return;
-        await runPredictionFlow(context, File(image.path));
+      if (xfile == null) {
+        setState(() => _isLoading = false);
+        return;
       }
+      final bytes = await xfile.readAsBytes();
+      final image = CapturedImage(bytes: bytes);
+      if (!mounted) return;
+      await runPredictionFlow(context, image);
     } catch (e) {
-      debugPrint('Error taking picture: $e');
+      debugPrint('Web capture error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_hasError) {
-      return const SampleCameraTab(
-        errorMessage: 'Camera unavailable. Using sample image.',
-      );
-    }
-
-    if (!_isInit || _controller == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            onScaleStart: (details) {
-              _baseZoom = _currentZoom;
-            },
-            onScaleUpdate: (details) async {
-              if (_controller != null && _controller!.value.isInitialized) {
-                double newZoom = (_baseZoom * details.scale).clamp(kCameraMinZoom, kCameraMaxZoom);
-                setState(() {
-                  _currentZoom = newZoom;
-                });
-                await _controller!.setZoomLevel(_currentZoom);
-              }
-            },
-            child: CameraPreview(_controller!),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.camera_alt, size: 80, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'Tap the button to take a photo',
+            style: TextStyle(fontSize: 18, color: Colors.grey),
           ),
-        ),
-        // Black flick overlay
-        if (_showBlackFlick)
-          Positioned.fill(
-            child: AnimatedOpacity(
-              opacity: _showBlackFlick ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 80),
-              child: Container(color: Colors.black),
-            ),
+          const SizedBox(height: 32),
+          ShutterButton(
+            onTap: _isLoading ? () {} : _capturePhoto,
           ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 32.0),
-            child: ShutterButton(
-              onTap: () {
-                if (_controller != null && _controller!.value.isInitialized) {
-                  _takePicture();
-                } else {
-                  debugPrint('Camera not initialized, ignoring shutter press');
-                }
-              },
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
+/// Sample image fallback (works on all platforms via asset bytes).
 class SampleCameraTab extends StatefulWidget {
   final String? errorMessage;
   const SampleCameraTab({super.key, this.errorMessage});
@@ -212,21 +149,15 @@ class SampleCameraTab extends StatefulWidget {
 class _SampleCameraTabState extends State<SampleCameraTab> {
   bool _isLoading = false;
 
-  Future<File> _loadSampleImage() async {
-    final bytes = await rootBundle.load(kSampleImageAsset);
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/sample_lion.png');
-    await file.writeAsBytes(bytes.buffer.asUint8List());
-    return file;
-  }
-
   Future<void> _runSample() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      final file = await _loadSampleImage();
+      final byteData = await rootBundle.load(kSampleImageAsset);
+      final bytes = byteData.buffer.asUint8List();
+      final image = CapturedImage(bytes: bytes);
       if (!mounted) return;
-      await runPredictionFlow(context, file);
+      await runPredictionFlow(context, image);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -274,4 +205,3 @@ class _SampleCameraTabState extends State<SampleCameraTab> {
     );
   }
 }
-         
