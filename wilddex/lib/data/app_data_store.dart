@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'app_data.dart';
 import 'isar_models.dart';
 import '../models/park.dart';
+import '../models/species.dart';
+import '../models/taxa.dart';
 
 class AppDataStore {
   static const _dataVersion = 1;
@@ -29,7 +31,7 @@ class AppDataStore {
     final taxaEntities = await isar.taxaEntitys.where().findAll();
     final speciesEntities = await isar.speciesEntitys.where().findAll();
     final parksList = await _loadParksFromAssets();
-    return AppData.fromEntities(speciesEntities, taxaEntities, parksList);
+    return _fromEntities(speciesEntities, taxaEntities, parksList);
   }
 
   static Future<Isar> _openIsar() async {
@@ -139,6 +141,48 @@ class AppDataStore {
     if (name == null) return '';
     return '${rank.toLowerCase()}|${name.toLowerCase()}';
   }
+}
+
+AppData _fromEntities(
+  List<SpeciesEntity> speciesEntities,
+  List<TaxaEntity> taxaEntities,
+  List<Park> parksList,
+) {
+  final taxaList = taxaEntities
+      .map((t) => Taxa(
+            name: t.name,
+            commonName: t.commonName ?? '',
+            rank: t.rank,
+            description: t.description ?? '',
+          ))
+      .toList(growable: false);
+  final taxaById = {for (final t in taxaEntities) t.taxonId: t};
+
+  String? taxonName(String? id) {
+    if (id == null) return null;
+    return taxaById[id]?.name;
+  }
+
+  final speciesList = speciesEntities
+      .map((s) => Species(
+            id: s.speciesId,
+            name: s.commonName,
+            scientificName: s.scientificName,
+            description: s.summary,
+            classification: Classification(
+              kingdom: taxonName(s.kingdomId),
+              phylum: taxonName(s.phylumId),
+              class_: taxonName(s.classId),
+              order: taxonName(s.orderId),
+              family: taxonName(s.familyId),
+              genus: taxonName(s.genusId),
+              species: taxonName(s.speciesTaxonId),
+            ),
+            iucnStatus: s.iucnStatus,
+          ))
+      .toList(growable: false);
+
+  return AppData.buildIndices(speciesList, taxaList, parksList: parksList);
 }
 
 List<dynamic> _decodeJsonList(String raw) {

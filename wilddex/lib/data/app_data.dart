@@ -1,7 +1,6 @@
 import '../models/species.dart';
 import '../models/park.dart';
 import '../models/taxa.dart';
-import 'isar_models.dart';
 
 class AppData {
   final List<Species> speciesList;
@@ -143,50 +142,7 @@ class AppData {
     }).toList(growable: false);
 
     final taxaList = taxaById.values.toList(growable: false);
-    return _buildIndices(speciesList, taxaList, parksList: parksList);
-  }
-
-  static AppData fromEntities(
-    List<SpeciesEntity> speciesEntities,
-    List<TaxaEntity> taxaEntities,
-    List<Park> parksList,
-  ) {
-    final taxaList = taxaEntities
-        .map(
-          (t) => Taxa(
-            name: t.name,
-            commonName: t.commonName ?? '',
-            rank: t.rank,
-            description: t.description ?? '',
-          ),
-        )
-        .toList(growable: false);
-    final taxaById = {
-      for (final t in taxaEntities) t.taxonId: t,
-    };
-
-    final speciesList = speciesEntities
-        .map(
-          (s) => Species(
-            id: s.speciesId,
-            name: s.commonName,
-            scientificName: s.scientificName,
-            description: s.summary,
-            classification: Classification(
-              kingdom: _taxonNameEntity(taxaById, s.kingdomId),
-              phylum: _taxonNameEntity(taxaById, s.phylumId),
-              class_: _taxonNameEntity(taxaById, s.classId),
-              order: _taxonNameEntity(taxaById, s.orderId),
-              family: _taxonNameEntity(taxaById, s.familyId),
-              genus: _taxonNameEntity(taxaById, s.genusId),
-              species: _taxonNameEntity(taxaById, s.speciesTaxonId),
-            ),
-            iucnStatus: s.iucnStatus,
-          ),
-        )
-        .toList(growable: false);
-
-    return _buildIndices(speciesList, taxaList, parksList: parksList);
+    return buildIndices(speciesList, taxaList, parksList: parksList);
   }
 
   static String? _taxonName(
@@ -198,15 +154,7 @@ class AppData {
     return taxaById[key]?.name;
   }
 
-  static String? _taxonNameEntity(
-    Map<String, TaxaEntity> taxaById,
-    String? id,
-  ) {
-    if (id == null) return null;
-    return taxaById[id]?.name;
-  }
-
-  static AppData _buildIndices(
+  static AppData buildIndices(
     List<Species> speciesList,
     List<Taxa> taxaList, {
     List<Park> parksList = const [],
